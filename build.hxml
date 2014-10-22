@@ -9,6 +9,9 @@
 #apply "null safety" to standart types? (return `0` for Int/Float, `false` for Bool. Currently always false)
 -D NS_STDTYPES
 
+#don't provide null safety for writing operations (currently always false)
+-D NS_NOWRITE
+
 # -cpp build/cpp
 # -cmd chmod +x build/cpp/Test-debug
 # -cmd ./build/cpp/Test-debug
