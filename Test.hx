@@ -15,18 +15,15 @@ class Test {
     *
     */
     static public function main () : Void {
-        var t : TDef = {w:1};
-        // trace(t);
+        var t  : Test = new Test();
+        var ns : NullSafe<Test> = t;
 
-        var ns : NullSafe<Test> = null;
-
-        trace(ns);
-        trace(ns.q);
-        trace(ns.q.q);
-        trace(ns.q.q.q);
+        trace(ns);          //test instance
+        trace(ns.w);        //1
+        trace(ns.q);        //null
+        trace(ns.q.q.q);    //null
         trace(ns.q.w);      //"Null object reference" error, since basic types can't be set to null
 
-        var tt : Test = ns;
         // var ns : NullSafe<Int>;
         // var ns : NullSafe<Array<Int>>;
         // var ns : NullSafe<Dynamic>;

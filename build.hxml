@@ -2,14 +2,19 @@
 -main Test
 -debug
 -D NS_DEBUG
--D NS_STD_DEFAULTS
 
--cpp build/cpp
--cmd chmod +x build/cpp/Test-debug
--cmd ./build/cpp/Test-debug
+#apply null safety for nested fields of objects? (currently always true)
+-D NS_RECURSIVE
 
-#-neko build/test.n
-#-cmd neko build/test.n
+#apply "null safety" to standart types? (return `0` for Int/Float, `false` for Bool. Currently always false)
+-D NS_STDTYPES
+
+# -cpp build/cpp
+# -cmd chmod +x build/cpp/Test-debug
+# -cmd ./build/cpp/Test-debug
+
+-neko build/test.n
+-cmd neko build/test.n
 
 #-js build/test.js
 #-cmd nodejs build/test.js
