@@ -15,21 +15,20 @@ class Test {
     *
     */
     static public function main () : Void {
-        var t  : Test = new Test();
-        var ns : NullSafe<Test> = t;
+        var ns : NullSafe<Test> = new Test();
 
         //write
-        trace(ns.w = 2);                   //2
-        trace(ns.q.q.q.q = new Test());    //null
+        trace(ns.q.w = 2);                 //2
+        trace(ns.q.q.q.q = new Test());    //Test instance
 
         //read
-        trace(ns);          //test instance
-        trace(ns.w);        //2
+        trace(ns);          //Test instance
+        trace(ns.w);        //1
         trace(ns.q);        //null
         trace(ns.q.q.q);    //null
-        trace(ns.q.w);      //"Null object reference" error, since basic types can't be set to null
+        trace(ns.q.w);      //1 - default value for this field
 
-
+        // (t : NullSafe<Test>).q.q.q = new Test();
 
         // var ns : NullSafe<Int>;
         // var ns : NullSafe<Array<Int>>;

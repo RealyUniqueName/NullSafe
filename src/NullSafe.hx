@@ -5,7 +5,7 @@ package;
 * Null safety implementation
 *
 */
-@:genericBuild(nullsafe.NullSafeBuilder.buildInstance())
+@:genericBuild(nullsafe.NullSafeBuilder.build())
 class NullSafe<T> {
 
 
