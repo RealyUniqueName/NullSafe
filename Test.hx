@@ -18,11 +18,18 @@ class Test {
         var t  : Test = new Test();
         var ns : NullSafe<Test> = t;
 
+        //write
+        trace(ns.w = 2);                   //2
+        trace(ns.q.q.q.q = new Test());    //null
+
+        //read
         trace(ns);          //test instance
-        trace(ns.w);        //1
+        trace(ns.w);        //2
         trace(ns.q);        //null
         trace(ns.q.q.q);    //null
         trace(ns.q.w);      //"Null object reference" error, since basic types can't be set to null
+
+
 
         // var ns : NullSafe<Int>;
         // var ns : NullSafe<Array<Int>>;
