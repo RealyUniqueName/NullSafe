@@ -20,7 +20,7 @@ class NullSafeBuilder {
     * Description
     *
     */
-    macro static public function build () : Type {
+    macro static public function build (recursive:Bool = false) : Type {
 
 
         var pos  : Position = Context.currentPos();
@@ -29,7 +29,7 @@ class NullSafeBuilder {
         switch (Context.getLocalType()) {
             //classes
             case TInst(_,[TInst(t, params)]):
-                type = defineType(t.get(), t.toString().toComplex());
+                type = defineType(t.get(), t.toString().toComplex(), recursive);
 
             //abstracts
             case TInst(_,[TAbstract(t, params)]):
@@ -37,7 +37,7 @@ class NullSafeBuilder {
                     return t.toString().toComplex().toType();
                 }
 
-                type = defineType(t.get().impl.get(), t.toString().toComplex());
+                type = defineType(t.get().impl.get(), t.toString().toComplex(), recursive);
             case _:
                 #if nullsafe_debug
                     trace ("Can't implement null safety for this type:", Context.getLocalType());
@@ -55,8 +55,8 @@ class NullSafeBuilder {
     * Description
     *
     */
-    static private function typeName (t:ClassType) : String {
-        return t.pack.join('_') + '_' + t.module + '_' + t.name + '_Abstract';
+    static private function typeName (t:ClassType, recursive:Bool) : String {
+        return t.pack.join('_') + '_' + t.module + '_' + t.name + '_' + (recursive ? 'R' : '') + 'RAbstract';
     }//function typeName()
 
 
@@ -64,13 +64,13 @@ class NullSafeBuilder {
     * Description
     *
     */
-    static private function defineType (type:ClassType, complex:ComplexType) : Type {
+    static private function defineType (type:ClassType, complex:ComplexType, recursive:Bool) : Type {
         //return underlying type for code completion
         if (Context.defined('display')) {
             return complex.toType();
         }
 
-        var abstractName : String = typeName(type);
+        var abstractName : String = typeName(type, recursive);
 
         var defined : Type = getDefined('nullsafe.$abstractName');
         if (defined != null) return defined;
@@ -80,10 +80,10 @@ class NullSafeBuilder {
             params   : null, //Null<Array<TypeParamDecl>>
             pack     : ['nullsafe'], //Array<String>
             name     : abstractName, //String
-            meta     : null, //Null<Metadata>
+            meta     : [{name:':forward', params:null, pos:Context.currentPos()}], //Null<Metadata>
             kind     : TDAbstract(complex, [complex], [complex]), //TDAbstract (tthis:Null<ComplexType>, from:Array<ComplexType>, to:Array<ComplexType>)
             isExtern : false, //Null<Bool>
-            fields   : buildClassFields(type) //Array<Field>
+            fields   : buildClassFields(type, recursive) //Array<Field>
         }
 
         Context.defineType(td);
@@ -108,7 +108,7 @@ class NullSafeBuilder {
     * Description
     *
     */
-    static private function buildClassFields (type:ClassType) : Array<Field> {
+    static private function buildClassFields (type:ClassType, recursive:Bool) : Array<Field> {
         var fields   : Array<Field> = [];
         var pos      : Position = Context.currentPos();
         var nosafety : Bool = false;
@@ -123,14 +123,14 @@ class NullSafeBuilder {
                 case _: false;
             }
 
-            var nstype : ComplexType = (nosafety ? type : macro:NullSafe<$type>);
+            var nstype : ComplexType = (nosafety || !recursive ? type : macro:NullSafeDeep<$type>);
 
             switch (f.kind) {
                 case FVar(_,_) :
                     fields = fields.concat(buildProperty(f, nstype));
 
                 case FMethod(k) :
-                    throw "not implemented";
+                    //throw "not implemented";
             }
         }
 
@@ -146,10 +146,11 @@ class NullSafeBuilder {
         var field : String = f.name;
         var get   : String = 'get_${f.name}';
         var set   : String = 'set_${f.name}';
+
         var def : Expr = (
             f.expr() == null
-                ? macro null
-                : Context.parse(TypedExprTools.toString(f.expr(), true), f.expr().pos)
+                ? defaultValue(type)
+                : typedExprToExpr(f.expr())
         );
 
         var dummy : TypeDefinition = macro class Dummy {
@@ -165,5 +166,32 @@ class NullSafeBuilder {
         return dummy.fields;
     }//function buildProperty()
 
+
+    /**
+    * Description
+    *
+    */
+    static private function defaultValue (type:ComplexType) : Expr {
+        return switch (type) {
+            case macro:StdTypes.Int     : macro 0;
+            case macro:StdTypes.Float   : macro 0.0;
+            case macro:StdTypes.Bool    : macro false;
+            case _: macro null;
+        }
+    }//function defaultValue()
+
+
+    /**
+    * Description
+    *
+    */
+    static private function typedExprToExpr (texpr:TypedExpr) : Expr {
+        return switch (texpr.expr) {
+            case TConst(TFloat(v)):
+                {expr:EConst(CFloat(v)), pos:texpr.pos};
+            case _:
+                Context.parse(TypedExprTools.toString(texpr, true), texpr.pos);
+        }
+    }//function typedExprToExpr()
 
 }//class NullSafeBuilder
