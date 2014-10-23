@@ -9,6 +9,9 @@ using StringTools;
 using haxe.macro.Tools;
 
 
+typedef TClassFields = {fields:Array<ClassField>}
+
+
 /**
 * Description
 *
@@ -21,33 +24,7 @@ class NullSafeBuilder {
     *
     */
     macro static public function build (recursive:Bool = false) : Type {
-
-
-        var pos  : Position = Context.currentPos();
-        var type : Type = null;
-
-        switch (Context.getLocalType()) {
-            //classes
-            case TInst(_,[TInst(t, params)]):
-                type = defineType(t.get(), t.toString().toComplex(), recursive);
-
-            //abstracts
-            case TInst(_,[TAbstract(t, params)]):
-                if (t.get().impl == null) {
-                    return t.toString().toComplex().toType();
-                }
-
-                type = defineType(t.get().impl.get(), t.toString().toComplex(), recursive);
-            case _:
-                #if nullsafe_debug
-                    trace ("Can't implement null safety for this type:", Context.getLocalType());
-                #else
-                    Context.error("Can't implement null safety for this type.", pos);
-                #end
-
-        }
-
-        return type;
+        return buildAbstract(Context.getLocalType(), recursive);
     }//function build()
 
 
@@ -55,8 +32,52 @@ class NullSafeBuilder {
     * Description
     *
     */
-    static private function typeName (t:ClassType, recursive:Bool) : String {
-        return t.pack.join('_') + '_' + t.module + '_' + t.name + '_' + (recursive ? 'R' : '') + 'RAbstract';
+    static private function buildAbstract (type:Type, recursive:Bool) : Type {
+        switch (type) {
+            //classes
+            case TInst(_,[TInst(t, params)]):
+                type = defineType(t.toString(), t.get().fields.get(), t.toString().toComplex(), recursive);
+
+            //abstracts
+            case TInst(_,[TAbstract(t, params)]):
+                if (t.get().impl == null) {
+                    return t.toString().toComplex().toType();
+                }
+
+                type = defineType(t.toString(), t.get().impl.get().fields.get(), t.toString().toComplex(), recursive);
+
+            //typedefs
+            case TInst(ns,[TType(t,params)]):
+                type = buildAbstract(TInst(ns, [t.get().type]), recursive);
+
+            //anonymous
+            case TInst(_, [TAnonymous(t)]):
+                Context.error("Can't implement null safety for anonymous structures.", Context.currentPos());
+
+            //typedefs
+            case TInst(ns,[TDynamic(t)]):
+                Context.error("Can't implement null safety for Dynamic.", Context.currentPos());
+
+            case _:
+                #if NS_DEBUG
+                    trace ("Can't implement null safety for this type:", Context.getLocalType(), type);
+                    type = null;
+                #else
+                    Context.error("Can't implement null safety for this type.", Context.currentPos());
+                #end
+
+        }
+
+        return type;
+    }//function buildAbstract()
+
+
+    /**
+    * Description
+    *
+    */
+    static private function typeName (name:String, recursive:Bool) : String {
+        return name.replace('.', '_').replace('<', '_').replace('>', '_') + '_' + (recursive ? 'R' : '') + 'Abstract';
     }//function typeName()
 
 
@@ -64,13 +85,33 @@ class NullSafeBuilder {
     * Description
     *
     */
-    static private function defineType (type:ClassType, complex:ComplexType, recursive:Bool) : Type {
+    static private function generateName (fields:Array<ClassField>) : String {
+        var name : String = 'A';
+        for (f in fields) {
+            name += f.name;
+            name += switch (f.type) {
+                case TAnonymous(t) : generateName(t.get().fields);
+                case _             : f.type.toString();
+            }
+        }
+
+        return haxe.crypto.Md5.encode(name);
+    }//function generateName()
+
+
+    /**
+    * Description
+    *
+    */
+    static private function defineType (srcName:Null<String>, fields:Array<ClassField>, complex:ComplexType, recursive:Bool) : Type {
         //return underlying type for code completion
         if (Context.defined('display')) {
             return complex.toType();
         }
 
-        var abstractName : String = typeName(type, recursive);
+        if (srcName == null) srcName = generateName(fields);
+
+        var abstractName : String = typeName(srcName, recursive);
 
         var defined : Type = getDefined('nullsafe.$abstractName');
         if (defined != null) return defined;
@@ -83,7 +124,7 @@ class NullSafeBuilder {
             meta     : [{name:':forward', params:null, pos:Context.currentPos()}], //Null<Metadata>
             kind     : TDAbstract(complex, [complex], [complex]), //TDAbstract (tthis:Null<ComplexType>, from:Array<ComplexType>, to:Array<ComplexType>)
             isExtern : false, //Null<Bool>
-            fields   : buildClassFields(type, recursive) //Array<Field>
+            fields   : buildClassFields(fields, recursive) //Array<Field>
         }
 
         Context.defineType(td);
@@ -108,12 +149,12 @@ class NullSafeBuilder {
     * Description
     *
     */
-    static private function buildClassFields (type:ClassType, recursive:Bool) : Array<Field> {
+    static private function buildClassFields (classFields:Array<ClassField>, recursive:Bool) : Array<Field> {
         var fields   : Array<Field> = [];
         var pos      : Position = Context.currentPos();
         var nosafety : Bool = false;
 
-        for (f in type.fields.get()) {
+        for (f in classFields) {
             var type   : ComplexType = f.type.toComplexType();
 
             nosafety = switch (type) {

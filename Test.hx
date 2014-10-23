@@ -48,12 +48,15 @@ class Test {
         trace(ns.intWithDefault);   // 1
         trace(ns.q.q);              //"Null object reference" error, because only `ns` is null-safe
 
-        // var ns : NullSafe<Int>;
+        // var ns : NullSafe<Int> = 1;
+        // var ns : NullSafeDeep<TDef> = null;
         // var ns : NullSafe<Array<Int>>;
         // var ns : NullSafe<Dynamic>;
         // var ns : NullSafe<AbsTest>;
 
-        ns.method();
+        // var ns : NullSafeDeep<Dynamic> = null;
+
+        // ns.method();
         // ns.q.method();
 
     }//function main()
@@ -80,4 +83,6 @@ class Test {
 
 
 abstract AbsTest(Int) from Int to Int { function new(t) this = t; }
-typedef TDef = {w:Int}
+typedef TDef = {w:Int,t:Test}
+typedef TTest1 = Test;
+typedef TTest = TTest1;
